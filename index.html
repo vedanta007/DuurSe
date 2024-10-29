@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remote Job Matcher</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold text-center mb-8">Remote Job Matcher</h1>
+        
+        <div class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
+            <form id="uploadForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Resume (PDF)</label>
+                    <input type="file" name="resume" accept=".pdf" required
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Companies List (Excel)</label>
+                    <input type="file" name="companies" accept=".xlsx" required
+                           class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                </div>
+
+                <button type="submit" 
+                        class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Find Matching Jobs
+                </button>
+            </form>
+
+            <div id="results" class="mt-8 hidden">
+                <h2 class="text-xl font-semibold mb-4">Matching Jobs</h2>
+                <div id="jobsList" class="space-y-4"></div>
+            </div>
+
+            <div id="loading" class="hidden mt-4 text-center">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+                <p class="mt-2 text-gray-600">Processing your request...</p>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const form = e.target;
+            const formData = new FormData(form);
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            const jobsList = document.getElementById('jobsList');
+
+            try {
+                loading.classList.remove('hidden');
+                results.classList.add('hidden');
+                
+                const response = await fetch('/.netlify/functions/process-jobs', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                
+                if (response.ok) {
+                    jobsList.innerHTML = '';
+                    
+                    if (data.jobs && data.jobs.length > 0) {
+                        data.jobs.forEach(job => {
+                            const jobElement = document.createElement('div');
+                            jobElement.className = 'bg-gray-50 p-4 rounded-lg';
+                            jobElement.innerHTML = `
+                                <h3 class="font-semibold">${job.title}</h3>
+                                <p class="text-gray-600">${job.company}</p>
+                                <p class="text-gray-500">${job.location}</p>
+                                <div class="mt-2">
+                                    <span class="text-green-600">Match Score: ${job.matchDetails.matchScore}%</span>
+                                </div>
+                                <a href="${job.link}" target="_blank" 
+                                   class="text-indigo-600 hover:text-indigo-800 mt-2 inline-block">
+                                    View Job
+                                </a>
+                            `;
+                            jobsList.appendChild(jobElement);
+                        });
+                    } else {
+                        jobsList.innerHTML = `<p class="text-gray-600">${data.message}</p>`;
+                    }
+                    
+                    results.classList.remove('hidden');
+                } else {
+                    throw new Error(data.error || 'Failed to process files');
+                }
+            } catch (error) {
+                alert(error.message);
+            } finally {
+                loading.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
